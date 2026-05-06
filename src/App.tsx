@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
-import { ChevronDown, Heart, Music2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ChevronDown, Heart, Pause, Play } from 'lucide-react';
 
 // Using high-quality Unsplash placeholders matching the aesthetic
 const LetterContent = () => {
@@ -52,6 +52,179 @@ const LetterContent = () => {
     </motion.div>
   );
 };
+
+// ============================================================
+// MUSIC PLAYER COMPONENT
+// ============================================================
+function MusicPlayer({ isOpen }: { isOpen: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  // Auto-play once the envelope is opened (user has interacted with the page)
+  useEffect(() => {
+    if (isOpen && !hasStarted) {
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.volume = 0;
+      audio.play().then(() => {
+        setIsPlaying(true);
+        setHasStarted(true);
+        // Fade in gently
+        let vol = 0;
+        const fadeIn = setInterval(() => {
+          vol = Math.min(vol + 0.05, 0.7);
+          audio.volume = vol;
+          if (vol >= 0.7) clearInterval(fadeIn);
+        }, 100);
+        // Show tooltip briefly
+        setShowTooltip(true);
+        setTimeout(() => setShowTooltip(false), 3500);
+      }).catch(() => {
+        // Autoplay blocked — user can click manually
+      });
+    }
+  }, [isOpen, hasStarted]);
+
+  const toggle = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      audio.play().then(() => setIsPlaying(true));
+    }
+  }, [isPlaying]);
+
+  return (
+    <>
+      {/* Hidden Audio Element */}
+      <audio
+        ref={audioRef}
+        src="/audio/ini-abadi.mp3"
+        loop
+        preload="auto"
+      />
+
+      {/* Floating Music Button */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0, y: 40 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0, y: 40 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+            className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3"
+          >
+            {/* Song Info Tooltip */}
+            <AnimatePresence>
+              {showTooltip && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20, scale: 0.9 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 20, scale: 0.9 }}
+                  transition={{ duration: 0.4 }}
+                  className="flex items-center gap-2 bg-beige-warm/90 backdrop-blur-md border border-clay/20 rounded-2xl px-4 py-2.5 shadow-lg"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-charcoal leading-tight">Ini Abadi</span>
+                    <span className="text-[10px] text-charcoal/50 leading-tight">Perunggu</span>
+                  </div>
+                  {/* Animated sound bars */}
+                  <div className="flex items-end gap-0.5 h-4 ml-1">
+                    {[1, 2, 3].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-0.5 bg-clay rounded-full"
+                        animate={isPlaying ? {
+                          height: ['6px', '14px', '4px', '12px', '6px'],
+                        } : { height: '4px' }}
+                        transition={{
+                          duration: 0.8,
+                          repeat: Infinity,
+                          delay: i * 0.15,
+                          ease: 'easeInOut',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Main Button */}
+            <motion.button
+              onClick={toggle}
+              onHoverStart={() => setShowTooltip(true)}
+              onHoverEnd={() => setShowTooltip(false)}
+              whileTap={{ scale: 0.9 }}
+              className="relative w-14 h-14 rounded-full flex items-center justify-center cursor-pointer"
+              style={{
+                background: 'radial-gradient(circle at 35% 35%, #d8baa5, #C19A81, #a37c62)',
+                boxShadow: '0 4px 20px rgba(193, 154, 129, 0.5), inset 0 1px 1px rgba(255,255,255,0.3)',
+              }}
+              aria-label={isPlaying ? 'Pause music' : 'Play music'}
+            >
+              {/* Pulse ring when playing */}
+              {isPlaying && (
+                <>
+                  <motion.span
+                    className="absolute inset-0 rounded-full border-2 border-clay/40"
+                    animate={{ scale: [1, 1.5, 1.8], opacity: [0.6, 0.3, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+                  />
+                  <motion.span
+                    className="absolute inset-0 rounded-full border border-clay/30"
+                    animate={{ scale: [1, 1.8, 2.2], opacity: [0.4, 0.2, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeOut', delay: 0.5 }}
+                  />
+                </>
+              )}
+
+              {/* Vinyl spinning disc */}
+              <motion.div
+                className="absolute inset-1.5 rounded-full bg-charcoal/80 flex items-center justify-center"
+                animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+                transition={isPlaying ? { duration: 4, repeat: Infinity, ease: 'linear' } : { duration: 0.3 }}
+              >
+                <div className="w-3 h-3 rounded-full bg-beige-warm/80" />
+              </motion.div>
+
+              {/* Play/Pause icon overlay */}
+              <AnimatePresence mode="wait">
+                {isPlaying ? (
+                  <motion.div
+                    key="pause"
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <Pause className="w-4 h-4 text-white/0" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="play"
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <Play className="w-5 h-5 text-white drop-shadow-sm" fill="white" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
 
 export default function App() {
   const [isOpen, setIsOpen] = useState(false);
@@ -269,34 +442,10 @@ export default function App() {
 
       {/* 
         ========================================================================
-        SPOTIFY WIDGET (Floating)
+        FLOATING MUSIC PLAYER
         ========================================================================
       */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.5 }}
-            animate={{ opacity: 0.6, y: 0, scale: 0.85 }}
-            whileHover={{ scale: 0.95, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="fixed bottom-2 md:bottom-4 right-2 md:right-4 z-50 origin-bottom-right"
-          >
-            <div className="relative rounded-2xl shadow-lg border border-clay/20 overflow-hidden bg-beige-warm/50 backdrop-blur-sm" style={{ width: '260px', height: '80px' }}>
-              <iframe 
-                style={{ borderRadius: '16px' }} 
-                src="https://open.spotify.com/embed/track/6v5RJuJ9yhvaXkMXMeMZBw?utm_source=generator&theme=0&autoplay=1" 
-                width="100%" 
-                height="80" 
-                frameBorder="0" 
-                allowFullScreen={false}
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-                loading="lazy"
-                title="Romantic Spotify Playlist"
-              ></iframe>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MusicPlayer isOpen={isOpen} />
       
       {/* Background overall grain */}
       <div className="grain-overlay opacity-20 fixed inset-0 z-0 pointer-events-none mix-blend-multiply hidden md:block"></div>
